@@ -1,0 +1,269 @@
+.container {
+    min-height: 100vh;
+    background-color: var(--background);
+    padding: 40px;
+}
+
+.content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.title {
+    font-family: var(--font-serif);
+    font-size: 36px;
+    color: var(--foreground);
+    font-weight: 400;
+}
+
+.actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+
+.btnSecondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--foreground);
+    border-color: var(--glass-border);
+}
+
+.btnSecondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btnDestructive {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.2);
+}
+
+.btnDestructive:hover {
+    background: rgba(231, 76, 60, 0.2);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: minmax(350px, 1fr) 1.5fr;
+    gap: 40px;
+}
+
+@media (max-width: 900px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Card Styles */
+.card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 32px;
+}
+
+.sectionTitle {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: var(--foreground);
+}
+
+/* Form Styles */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.label {
+    font-size: 13px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.input,
+.select {
+    width: 100%;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+}
+
+.input:focus,
+.select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.helperText {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.sectionDivider {
+    margin-top: 16px;
+    padding-top: 24px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.subTitle {
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.createBtn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+/* Album List */
+.albumList {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.albumItem {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    transition: var(--transition);
+}
+
+.albumItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+}
+
+.albumThumb {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #222;
+}
+
+.albumInfo {
+    flex: 1;
+    min-width: 0;
+}
+
+.albumTitle {
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.albumMeta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #888;
+}
+
+.badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+}
+
+.badgeLocked {
+    color: var(--accent);
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.albumActions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.actionBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.viewBtn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--foreground);
+}
+
+.deleteBtn {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    width: 100%;
+}
+
+.emptyState {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+}
