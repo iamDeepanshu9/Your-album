@@ -1,7 +1,4 @@
-import fs from 'fs/promises';
-import path from 'path';
-
-const DB_PATH = path.join(process.cwd(), 'db/albums.json');
+import { supabase, supabaseAdmin } from './supabase';
 
 export interface Photo {
     id: string;
@@ -22,39 +19,45 @@ export interface Album {
     photos?: Photo[];
 }
 
-// Ensure the db folder exists
-const ensureDb = async () => {
-    try {
-        await fs.access(DB_PATH);
-    } catch {
-        // If file doesn't exist, create it with empty array
-        await fs.writeFile(DB_PATH, '[]', 'utf-8');
-    }
-};
-
 export const getAlbums = async (): Promise<Album[]> => {
-    await ensureDb();
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
+    const { data, error } = await supabase
+        .from('albums')
+        .select('*')
+        .order('date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching albums:', error);
+        return [];
+    }
+    return data as Album[];
 };
 
 export const getAlbumById = async (id: string): Promise<Album | null> => {
-    const albums = await getAlbums();
-    return albums.find((album) => album.id === id) || null;
+    const { data, error } = await supabase
+        .from('albums')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (error) {
+        console.error(`Error fetching album ${id}:`, error);
+        return null;
+    }
+    return data as Album | null;
 };
 
 export const saveAlbum = async (album: Album) => {
-    const albums = await getAlbums();
-    const index = albums.findIndex((a) => a.id === album.id);
+    const { data, error } = await supabaseAdmin
+        .from('albums')
+        .upsert(album, { onConflict: 'id' })
+        .select()
+        .single();
 
-    if (index >= 0) {
-        albums[index] = album;
-    } else {
-        albums.push(album);
+    if (error) {
+        console.error('Error saving album:', error);
+        throw new Error(error.message);
     }
-
-    await fs.writeFile(DB_PATH, JSON.stringify(albums, null, 2), 'utf-8');
-    return album;
+    return data as Album;
 };
 
 const PHOTO_POOL = [
@@ -100,7 +103,9 @@ export const getAlbumWithPhotos = async (id: string) => {
 };
 
 export const deleteAlbum = async (id: string) => {
-    const albums = await getAlbums();
-    const newAlbums = albums.filter(a => a.id !== id);
-    await fs.writeFile(DB_PATH, JSON.stringify(newAlbums, null, 2), 'utf-8');
+    const { error } = await supabaseAdmin.from('albums').delete().eq('id', id);
+    if (error) {
+        console.error(`Error deleting album ${id}:`, error);
+        throw new Error(error.message);
+    }
 };
