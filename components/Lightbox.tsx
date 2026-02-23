@@ -38,6 +38,13 @@ export default function Lightbox({ photo, onClose, onNext, onPrev }: LightboxPro
         <div className={styles.overlay} onClick={onClose}>
             <button className={styles.closeBtn} onClick={onClose}>&times;</button>
 
+            <button className={styles.contactBtn} onClick={(e) => {
+                e.stopPropagation();
+                window.open(`mailto:deepanshu@example.com?subject=Inquiry about photo ${photo.id}&body=Hi, I am interested in this photo: ${photo.url}`, '_blank');
+            }}>
+                Contact Me
+            </button>
+
             {onPrev && (
                 <button className={`${styles.navBtn} ${styles.prevBtn}`} onClick={(e) => {
                     e.stopPropagation();

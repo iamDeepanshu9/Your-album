@@ -3,6 +3,13 @@ import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'db/albums.json');
 
+export interface Photo {
+    id: string;
+    url: string;
+    width: number;
+    height: number;
+}
+
 export interface Album {
     id: string;
     title: string;
@@ -11,8 +18,8 @@ export interface Album {
     location: string;
     type: string;
     accessCode?: string;
-    googlePhotosAlbumId?: string;
-    photos?: any[];
+    googlePhotosLink?: string;
+    photos?: Photo[];
 }
 
 // Ensure the db folder exists
@@ -77,8 +84,11 @@ export const getAlbumWithPhotos = async (id: string) => {
     const album = await getAlbumById(id);
     if (!album) return null;
 
-    // Use mock photos if no Google Photos integration yet.
-    // In a real scenario, this is where we'd fetch from Google Photos if album.googlePhotosAlbumId exists.
+    if (album.photos && album.photos.length > 0) {
+        return album;
+    }
+
+    // Use mock photos if no photos found
     const photos = PHOTO_POOL.map((url, i) => ({
         id: `photo-${id}-${i}`,
         url: `${url}?auto=format&fit=crop&w=800&q=80`,

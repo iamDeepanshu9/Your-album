@@ -1,56 +1,111 @@
-import { google } from 'googleapis';
 
-const SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly'];
+export interface GooglePhoto {
+    id: string;
+    url: string;
+    width: number;
+    height: number;
+}
 
-const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/api/auth/callback'
-);
+export async function extractPhotosFromAlbum(url: string): Promise<GooglePhoto[]> {
+    console.log(`Extracting photos from: ${url}`);
 
-export const getAuthUrl = () => {
-    return oauth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: SCOPES,
-    });
-};
+    try {
+        const response = await fetch(url);
 
-export const setCredentials = async (code: string) => {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-    return tokens;
-};
+        if (!response.ok) {
+            throw new Error(`Failed to fetch album: ${response.status}`);
+        }
 
-export const refreshAccessToken = async (refreshToken: string) => {
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
-    const { credentials } = await oauth2Client.refreshAccessToken();
-    return credentials;
-};
+        const html = await response.text();
 
-export const getPhotos = async (accessToken: string, albumId?: string) => {
-    // Note: The official googleapis library doesn't strictly support Photos Library API v1 directly 
-    // in the same way as others, sometimes raw requests are needed or specific libraries.
-    // For simplicity/demo we'll use raw fetch with the token, which is often standard for Photos API.
+        // Find AF_initDataCallback
+        const regex = /AF_initDataCallback\s*\(\s*({[^<]+})\s*\);/g;
+        let match;
 
-    const url = albumId
-        ? 'https://photoslibrary.googleapis.com/v1/mediaItems:search'
-        : 'https://photoslibrary.googleapis.com/v1/mediaItems';
+        while ((match = regex.exec(html)) !== null) {
+            const jsonLike = match[1];
 
-    const body = albumId ? JSON.stringify({ albumId, pageSize: 50 }) : undefined;
-    const method = albumId ? 'POST' : 'GET';
+            // Check for key: 'ds:1' (or similar, sometimes it changes but usually ds:1 is the main one for public albums)
+            // We can also check if the data contains the photos array structure.
 
-    const response = await fetch(url, {
-        method,
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-        },
-        body,
-    });
+            // Heuristic: check if data contains a large array with image URLs
+            if (jsonLike.includes('ds:1')) {
+                try {
+                    const data = parseDataFromCallback(jsonLike);
+                    if (data && Array.isArray(data)) {
+                        // Usually data[1] is the array of photos
+                        const photosArray = data[1];
+                        if (Array.isArray(photosArray)) {
+                            const photos = photosArray.map((item: any, index: number) => {
+                                // item[0] = id
+                                // item[1][0] = url
 
-    if (!response.ok) {
-        throw new Error(`Failed to fetch photos: ${response.statusText}`);
+                                // Video filter: items with key '76647426' in metadata (index 9) are videos
+                                // The dump shows item[9] is an object like { '15': ..., '76647426': [...] }
+                                if (item[9] && item[9]['76647426']) {
+                                    return null;
+                                }
+
+                                if (item && item[1] && Array.isArray(item[1])) {
+                                    const url = item[1][0];
+                                    const width = item[1][1];
+                                    const height = item[1][2];
+                                    const id = item[0];
+
+                                    if (url) {
+                                        return {
+                                            id: id || `photo-${index}`,
+                                            url: url,
+                                            width: width,
+                                            height: height
+                                        };
+                                    }
+                                }
+                                return null;
+                            }).filter((p: any) => p !== null) as GooglePhoto[];
+
+                            if (photos.length > 0) {
+                                console.log(`Found ${photos.length} photos.`);
+                                return photos;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing potential data block', e);
+                }
+            }
+        }
+
+        return [];
+
+    } catch (error) {
+        console.error('Error extracting photos:', error);
+        return [];
+    }
+}
+
+function parseDataFromCallback(jsonLike: string): any {
+    const dataIndex = jsonLike.indexOf('data:');
+    if (dataIndex === -1) return null;
+
+    const start = dataIndex + 5;
+    let bracketCount = 0;
+    let end = -1;
+
+    // Simple bracket counting to extract the JSON array
+    for (let i = start; i < jsonLike.length; i++) {
+        if (jsonLike[i] === '[') bracketCount++;
+        else if (jsonLike[i] === ']') bracketCount--;
+
+        if (bracketCount === 0 && i > start) {
+            end = i + 1;
+            break;
+        }
     }
 
-    return response.json();
-};
+    if (end !== -1) {
+        const dataString = jsonLike.substring(start, end);
+        return JSON.parse(dataString);
+    }
+    return null;
+}

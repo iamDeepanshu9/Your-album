@@ -41,6 +41,28 @@
     color: black;
 }
 
+.contactBtn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    z-index: 101;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 20px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.contactBtn:hover {
+    background: white;
+    color: black;
+}
+
 .navBtn {
     position: absolute;
     top: 50%;

@@ -1,40 +1,71 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import styles from './AlbumView.module.css';
 import Lightbox from './Lightbox';
-
-// We need to infer the return type of getAlbum, but since it's a mock, we can define the interface here matching data.ts
-interface Photo {
-    id: string;
-    url: string;
-    width: number;
-    height: number;
-}
-
-interface AlbumData {
-    id: string;
-    title: string;
-    coverImage: string;
-    date: string;
-    location: string;
-    photos: Photo[];
-}
+import { Album, Photo } from '@/lib/albums-db';
 
 interface AlbumViewProps {
-    album: AlbumData;
+    album: Album;
 }
 
 export default function AlbumView({ album }: AlbumViewProps) {
     const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
     const [isFiltered, setIsFiltered] = useState(false);
-    const [photos, setPhotos] = useState(album.photos);
+    const [photos, setPhotos] = useState<Photo[]>(album.photos || []);
+
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
 
     // AI State
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(0);
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const [detectedFaceUrl, setDetectedFaceUrl] = useState<string | null>(null);
+    const [showCamera, setShowCamera] = useState(false);
+
+    const startCamera = async () => {
+        setShowCamera(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            streamRef.current = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            console.error("Error accessing camera:", err);
+            alert("Could not access camera. Please allow permissions or use file upload.");
+            setShowCamera(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+            streamRef.current = null;
+        }
+        setShowCamera(false);
+    };
+
+    const captureSelfie = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(videoRef.current, 0, 0);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+                        handleFileUpload({ target: { files: [file] } } as any);
+                    }
+                }, 'image/jpeg');
+            }
+            stopCamera();
+        }
+    };
 
     // Load models on mount
     useEffect(() => {
@@ -66,7 +97,8 @@ export default function AlbumView({ album }: AlbumViewProps) {
     const toggleFilter = () => {
         if (isFiltered) {
             setIsFiltered(false);
-            setPhotos(album.photos);
+            setPhotos(album.photos || []);
+            setDetectedFaceUrl(null);
         } else {
             setShowUploadModal(true);
         }
@@ -85,44 +117,61 @@ export default function AlbumView({ album }: AlbumViewProps) {
 
             // 1. Get descriptor for uploaded file
             const imageUrl = URL.createObjectURL(file);
+            setDetectedFaceUrl(imageUrl);
             const img = document.createElement('img');
             img.src = imageUrl;
             await new Promise(r => img.onload = r);
 
-            const userDescriptor = await ai.getFaceDescriptor(img);
+            const userDescriptors = await ai.getFaceDescriptors(img);
 
-            if (!userDescriptor) {
+            if (!userDescriptors || userDescriptors.length === 0) {
                 alert('No face detected in your photo. Please try another one.');
                 setIsProcessing(false);
+                setDetectedFaceUrl(null);
                 return;
             }
+
+            const userDescriptor = userDescriptors[0];
 
             // 2. Match against album photos
             const faceMatcher = new (await import('face-api.js')).FaceMatcher(userDescriptor, 0.6);
             const matchedPhotos: Photo[] = [];
 
-            // Process in chunks or one by one
-            const total = album.photos.length;
+            const photosToProcess = album.photos || [];
+            const total = photosToProcess.length;
 
-            // Limit for demo purposes if too many. In a real app this would happen on backend.
-            // We act on the first 20 or all if less.
-            const photosToProcess = album.photos;
+            const CHUNK_SIZE = 5;
+            let processed = 0;
 
-            for (let i = 0; i < photosToProcess.length; i++) {
-                const photo = photosToProcess[i];
-                // In a real app we would have pre-computed descriptors. 
-                // Here we compute on fly which is slow but demonstrates the tech.
+            for (let i = 0; i < photosToProcess.length; i += CHUNK_SIZE) {
+                const chunk = photosToProcess.slice(i, i + CHUNK_SIZE);
 
-                const descriptor = await ai.processImage(photo.url);
+                const results = await Promise.all(
+                    chunk.map(async (photo) => {
+                        const descriptors = await ai.processImage(photo.url);
 
-                if (descriptor) {
-                    const match = faceMatcher.findBestMatch(descriptor);
-                    if (match.label !== 'unknown') {
+                        let isMatch = false;
+                        if (descriptors && descriptors.length > 0) {
+                            for (const d of descriptors) {
+                                const match = faceMatcher.findBestMatch(d);
+                                if (match.label !== 'unknown') {
+                                    isMatch = true;
+                                    break;
+                                }
+                            }
+                        }
+                        return { photo, isMatch };
+                    })
+                );
+
+                results.forEach(({ photo, isMatch }) => {
+                    if (isMatch) {
                         matchedPhotos.push(photo);
                     }
-                }
+                });
 
-                setProcessingProgress(Math.floor(((i + 1) / total) * 100));
+                processed += chunk.length;
+                setProcessingProgress(Math.floor((processed / total) * 100));
             }
 
             if (matchedPhotos.length > 0) {
@@ -130,7 +179,8 @@ export default function AlbumView({ album }: AlbumViewProps) {
                 setIsFiltered(true);
             } else {
                 alert('No matching photos found in this album.');
-                setPhotos(album.photos); // Reset
+                setPhotos(album.photos || []); // Reset
+                setDetectedFaceUrl(null);
             }
 
         } catch (error) {
@@ -163,27 +213,56 @@ export default function AlbumView({ album }: AlbumViewProps) {
             )}
 
             {showUploadModal && (
-                <div className={styles.modalOverlay} onClick={() => setShowUploadModal(false)}>
+                <div className={styles.modalOverlay} onClick={() => {
+                    setShowUploadModal(false);
+                    stopCamera();
+                }}>
                     <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                        <button className={styles.closeBtn} onClick={() => setShowUploadModal(false)}>&times;</button>
+                        <button className={styles.closeBtn} onClick={() => {
+                            setShowUploadModal(false);
+                            stopCamera();
+                        }}>&times;</button>
 
                         <h2 className={styles.modalTitle}>Find My Photos 📸</h2>
                         <p className={styles.modalText}>
-                            Upload a clear selfie, and our AI will magically find every photo of you in this album.
+                            Take a selfie or upload a clear photo, and our AI will magically find every photo of you in this album.
                         </p>
 
-                        <label className={styles.uploadLabel}>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileUpload}
-                                className={styles.hiddenInput}
-                                style={{ display: 'none' }}
-                            />
-                            <span className={styles.iconLarge}>📤</span>
-                            <div className={styles.uploadText}>Click to Upload Selfie</div>
-                            <div className={styles.uploadSubtext}>JPG or PNG</div>
-                        </label>
+                        {!showCamera ? (
+                            <div className={styles.uploadOptions}>
+                                <button className={styles.cameraBtn} onClick={startCamera}>
+                                    <span className={styles.iconLarge}>📷</span>
+                                    <div className={styles.uploadText}>Take Selfie</div>
+                                </button>
+                                <div className={styles.orText}>- OR -</div>
+                                <label className={styles.uploadLabel}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileUpload}
+                                        className={styles.hiddenInput}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <span className={styles.iconLarge}>📤</span>
+                                    <div className={styles.uploadText}>Click to Upload Selfie</div>
+                                    <div className={styles.uploadSubtext}>JPG or PNG</div>
+                                </label>
+                            </div>
+                        ) : (
+                            <div className={styles.cameraContainer}>
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className={styles.videoPreview}
+                                />
+                                <div className={styles.cameraActions}>
+                                    <button className={styles.captureBtn} onClick={captureSelfie}>Capture</button>
+                                    <button className={styles.cancelCameraBtn} onClick={stopCamera}>Cancel</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -191,7 +270,7 @@ export default function AlbumView({ album }: AlbumViewProps) {
             <div className={styles.hero}>
                 <div className={styles.heroBg}>
                     <Image
-                        src={album.coverImage}
+                        src={album.coverImage || album.photos?.[0]?.url || `https://picsum.photos/seed/${album.id}/800/600`}
                         alt={album.title}
                         fill
                         className={styles.heroImage}
@@ -212,6 +291,17 @@ export default function AlbumView({ album }: AlbumViewProps) {
                     </div>
 
                     <div className={styles.filterSection}>
+                        {isFiltered && detectedFaceUrl && (
+                            <div className={styles.detectedFaceThumb}>
+                                <Image
+                                    src={detectedFaceUrl}
+                                    alt="Detected face"
+                                    width={40}
+                                    height={40}
+                                    className={styles.thumbImage}
+                                />
+                            </div>
+                        )}
                         <button className={styles.filterBtn} onClick={toggleFilter}>
                             {isFiltered ? (
                                 <>

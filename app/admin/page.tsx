@@ -69,8 +69,8 @@ export default async function AdminDashboard() {
                                     <input name="accessCode" placeholder="Optional password" className={styles.input} />
                                 </div>
                                 <div className={styles.formGroup} style={{ marginTop: '16px' }}>
-                                    <label className={styles.label}>Google Photos ID</label>
-                                    <input name="googlePhotosAlbumId" placeholder="Album ID" className={styles.input} />
+                                    <label className={styles.label}>Google Photos or Drive Link</label>
+                                    <input name="googlePhotosLink" placeholder="https://photos.app.goo.gl/... or https://drive.google.com/..." className={styles.input} />
                                 </div>
                             </div>
 
@@ -88,7 +88,7 @@ export default async function AdminDashboard() {
                                 <div key={album.id} className={styles.albumItem}>
                                     <div className={styles.albumThumb}>
                                         <Image
-                                            src={album.coverImage || 'https://via.placeholder.com/150'}
+                                            src={album.coverImage || album.photos?.[0]?.url || `https://picsum.photos/seed/${album.id}/800/600`}
                                             alt={album.title}
                                             fill
                                             className="object-cover"
@@ -103,7 +103,7 @@ export default async function AdminDashboard() {
                                         </div>
                                         <div className={styles.badges}>
                                             {album.accessCode && <span className={`${styles.badge} ${styles.badgeLocked}`}>Locked</span>}
-                                            {album.googlePhotosAlbumId && <span className={styles.badge}>Linked</span>}
+                                            {album.googlePhotosLink && <span className={styles.badge}>Linked</span>}
                                         </div>
                                     </div>
                                     <div className={styles.albumActions}>

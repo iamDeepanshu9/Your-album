@@ -8,6 +8,7 @@ interface Album {
     coverImage: string;
     date: string;
     type?: string;
+    photos?: { url: string }[]; // Optional in case not populated
 }
 
 interface AlbumGridProps {
@@ -21,7 +22,7 @@ export default function AlbumGrid({ albums }: AlbumGridProps) {
                 <Link key={album.id} href={`/albums/${album.id}`} className={styles.card}>
                     <div className={styles.imageWrapper}>
                         <Image
-                            src={album.coverImage}
+                            src={album.coverImage || album.photos?.[0]?.url || `https://picsum.photos/seed/${album.id}/800/600`}
                             alt={album.title}
                             fill
                             className={styles.image}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "album-manager": {
+      "command": "npx",
+      "args": [
+        "tsx",
+        "/Users/deepanshukumar/projects/YourAlbum/scripts/mcp-album-server.ts"
+      ]
+    }
+  }
+}

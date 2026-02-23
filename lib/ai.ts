@@ -29,33 +29,34 @@ export async function loadModels() {
     }
 }
 
-export async function getFaceDescriptor(imageElement: HTMLImageElement): Promise<Float32Array | undefined> {
-    const detection = await faceapi.detectSingleFace(imageElement)
+export async function getFaceDescriptors(imageElement: HTMLImageElement): Promise<Float32Array[]> {
+    const detections = await faceapi.detectAllFaces(imageElement)
         .withFaceLandmarks()
-        .withFaceDescriptor();
+        .withFaceDescriptors();
 
-    return detection?.descriptor;
+    return detections.map(d => d.descriptor);
 }
 
-// Function to process a single image URL and return its descriptor
+// Function to process a single image URL and return its descriptors
 // This handles loading the image in memory
-export async function processImage(url: string): Promise<Float32Array | undefined> {
+export async function processImage(url: string): Promise<Float32Array[]> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "Anonymous";
-        img.src = url;
+        // Use proxy to avoid CORS issues with Google Photos
+        img.src = `/api/proxy-image?url=${encodeURIComponent(url)}`;
         img.onload = async () => {
             try {
-                const descriptor = await getFaceDescriptor(img);
-                resolve(descriptor);
+                const descriptors = await getFaceDescriptors(img);
+                resolve(descriptors);
             } catch (e) {
                 console.error("Error processing image", url, e);
-                resolve(undefined);
+                resolve([]);
             }
         };
         img.onerror = (e) => {
             console.error("Error loading image", url, e);
-            resolve(undefined);
+            resolve([]);
         };
     });
 }
